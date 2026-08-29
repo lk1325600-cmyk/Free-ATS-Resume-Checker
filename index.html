@@ -327,38 +327,49 @@ ul{padding-left:20px}
   </div>
 </div>
 
+
+<!-- Hidden form used to submit leads to Google Apps Script without browser CORS blocking. -->
+<iframe name="sheetSubmitFrame" id="sheetSubmitFrame" style="display:none" aria-hidden="true"></iframe>
+<form id="sheetSubmitForm" method="POST" target="sheetSubmitFrame" style="display:none">
+  <input type="hidden" name="name" id="sheetNameField">
+  <input type="hidden" name="designation" id="sheetDesignationField">
+  <input type="hidden" name="phone" id="sheetPhoneField">
+  <input type="hidden" name="score" id="sheetScoreField">
+  <input type="hidden" name="consent" id="sheetConsentField">
+  <input type="hidden" name="timestamp" id="sheetTimestampField">
+</form>
+
 <script>
 /* ============================================================
    GOOGLE SHEET CONNECTION
-   Paste your Google Apps Script Web App URL between the quotes
-   below. See the setup instructions provided alongside this file.
+   Your Google Apps Script Web App URL is configured below.
+   Leads are submitted using a standard form POST to avoid browser CORS issues.
    Leave blank ("") to run the tool without saving leads anywhere.
 ============================================================ */
 const SHEET_ENDPOINT = "https://script.google.com/macros/s/AKfycbzKavssD2xjYhzl7poZlONVP14m1uYugx-w5F_I5Rfg5zWEPVIDOnDOeW1R2W2ek9YUqA/exec";
 
-async function submitLeadToSheet(payload){
-  if(!SHEET_ENDPOINT) return {ok:false, skipped:true};
-  try{
-    const body = new URLSearchParams();
-    body.append("name", payload.name || "");
-    body.append("designation", payload.designation || "");
-    body.append("phone", payload.phone || "");
-    body.append("score", String(payload.score ?? ""));
-    body.append("consent", "Yes");
-    body.append("timestamp", payload.timestamp || new Date().toISOString());
+function submitLeadToSheet(payload){
+  if(!SHEET_ENDPOINT) return false;
 
-    // Google Apps Script Web Apps work reliably here with a form-style POST.
-    // no-cors prevents browser CORS policy from blocking the request.
-    await fetch(SHEET_ENDPOINT, {
-      method: "POST",
-      mode: "no-cors",
-      headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},
-      body: body.toString()
-    });
-    return {ok:true};
+  try{
+    const iframe = document.getElementById("sheetSubmitFrame");
+    const form = document.getElementById("sheetSubmitForm");
+
+    document.getElementById("sheetNameField").value = payload.name || "";
+    document.getElementById("sheetDesignationField").value = payload.designation || "";
+    document.getElementById("sheetPhoneField").value = payload.phone || "";
+    document.getElementById("sheetScoreField").value = String(payload.score ?? "");
+    document.getElementById("sheetConsentField").value = "Yes";
+    document.getElementById("sheetTimestampField").value = payload.timestamp || new Date().toISOString();
+
+    form.action = SHEET_ENDPOINT;
+    form.target = iframe.name;
+    form.submit();
+
+    return true;
   }catch(err){
     console.error("Google Sheet submission failed:", err);
-    return {ok:false, error:err};
+    return false;
   }
 }
 
@@ -448,7 +459,7 @@ function analyze(){
 }
 
 /* ---------------- scanning experience ---------------- */
-const TOTAL_SECONDS = 90; // 1:30
+const TOTAL_SECONDS = 59; // 0:59
 const STATUS_MESSAGES = [
   "Reading resume structure...",
   "Checking ATS-friendly formatting...",
@@ -548,7 +559,7 @@ function runScan(){
 document.getElementById("analyze").onclick=runScan;
 
 /* ---------------- lead capture ---------------- */
-async function unlockReport(){
+function unlockReport(){
   const name=document.getElementById("leadName").value.trim();
   const designation=document.getElementById("leadDesignation").value.trim();
   const phoneDigits=document.getElementById("leadPhone").value.trim();
@@ -571,12 +582,15 @@ async function unlockReport(){
     score: lastScore,
     timestamp: new Date().toISOString()
   };
-  const sheetResult = await submitLeadToSheet(leadPayload);
+  const submitted = submitLeadToSheet(leadPayload);
+
+  // Keep a local copy for troubleshooting/recovery.
   const localLeads = JSON.parse(localStorage.getItem("ats_leads") || "[]");
   localLeads.push(leadPayload);
   localStorage.setItem("ats_leads", JSON.stringify(localLeads));
-  if(!sheetResult.ok){
-    err.textContent="We couldn't save your details right now. Please try again.";
+
+  if(!submitted){
+    err.textContent="We couldn't submit your details. Please try again.";
     err.style.display="block";
     return;
   }
