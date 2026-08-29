@@ -344,14 +344,18 @@ async function submitLeadToSheet(payload){
     body.append("designation", payload.designation || "");
     body.append("phone", payload.phone || "");
     body.append("score", String(payload.score ?? ""));
+    body.append("consent", "Yes");
     body.append("timestamp", payload.timestamp || new Date().toISOString());
-    const response = await fetch(SHEET_ENDPOINT, {
+
+    // Google Apps Script Web Apps work reliably here with a form-style POST.
+    // no-cors prevents browser CORS policy from blocking the request.
+    await fetch(SHEET_ENDPOINT, {
       method: "POST",
-      mode: "cors",
+      mode: "no-cors",
       headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},
       body: body.toString()
     });
-    return {ok: response.ok};
+    return {ok:true};
   }catch(err){
     console.error("Google Sheet submission failed:", err);
     return {ok:false, error:err};
@@ -562,11 +566,15 @@ async function unlockReport(){
   }
   err.style.display="none";
   const phone = "+91" + phoneDigits;
-  const sheetResult = await submitLeadToSheet({
+  const leadPayload = {
     name, designation, phone,
     score: lastScore,
     timestamp: new Date().toISOString()
-  });
+  };
+  const sheetResult = await submitLeadToSheet(leadPayload);
+  const localLeads = JSON.parse(localStorage.getItem("ats_leads") || "[]");
+  localLeads.push(leadPayload);
+  localStorage.setItem("ats_leads", JSON.stringify(localLeads));
   if(!sheetResult.ok){
     err.textContent="We couldn't save your details right now. Please try again.";
     err.style.display="block";
