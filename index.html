@@ -307,7 +307,7 @@ ul{padding-left:20px}
       <div class="scan-beam"></div>
     </div>
 
-    <div class="timer mono" id="timer" aria-live="polite">00:05
+    <div class="timer mono" id="timer" aria-live="polite">01:30
 </div>
     <div class="timerLabel">estimated time remaining</div>
     <div class="progress"><span id="progressBar"></span></div>
@@ -336,16 +336,26 @@ ul{padding-left:20px}
 ============================================================ */
 const SHEET_ENDPOINT = "https://script.google.com/macros/s/AKfycbzKavssD2xjYhzl7poZlONVP14m1uYugx-w5F_I5Rfg5zWEPVIDOnDOeW1R2W2ek9YUqA/exec";
 
-function submitLeadToSheet(payload){
-  if(!SHEET_ENDPOINT) return;
+async function submitLeadToSheet(payload){
+  if(!SHEET_ENDPOINT) return {ok:false, skipped:true};
   try{
-    fetch(SHEET_ENDPOINT, {
+    const body = new URLSearchParams();
+    body.append("name", payload.name || "");
+    body.append("designation", payload.designation || "");
+    body.append("phone", payload.phone || "");
+    body.append("score", String(payload.score ?? ""));
+    body.append("timestamp", payload.timestamp || new Date().toISOString());
+    const response = await fetch(SHEET_ENDPOINT, {
       method: "POST",
-      mode: "no-cors",
-      headers: {"Content-Type":"text/plain;charset=utf-8"},
-      body: JSON.stringify(payload)
+      mode: "cors",
+      headers: {"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},
+      body: body.toString()
     });
-  }catch(err){ console.warn("Sheet submission failed silently:", err); }
+    return {ok: response.ok};
+  }catch(err){
+    console.error("Google Sheet submission failed:", err);
+    return {ok:false, error:err};
+  }
 }
 
 const stop = new Set(("a an and are as at be been being by for from had has have he her his i if in into is it its me my of on or our she that the their them they this to was we were what when where which who will with you your aap aur hai ke ka ki ko se par mein main ek yeh ye hai ho hain tha thi the".split(/\s+/)));
@@ -434,7 +444,7 @@ function analyze(){
 }
 
 /* ---------------- scanning experience ---------------- */
-const TOTAL_SECONDS = 05; // 0:05
+const TOTAL_SECONDS = 90; // 1:30
 const STATUS_MESSAGES = [
   "Reading resume structure...",
   "Checking ATS-friendly formatting...",
@@ -534,7 +544,7 @@ function runScan(){
 document.getElementById("analyze").onclick=runScan;
 
 /* ---------------- lead capture ---------------- */
-function unlockReport(){
+async function unlockReport(){
   const name=document.getElementById("leadName").value.trim();
   const designation=document.getElementById("leadDesignation").value.trim();
   const phoneDigits=document.getElementById("leadPhone").value.trim();
@@ -552,11 +562,16 @@ function unlockReport(){
   }
   err.style.display="none";
   const phone = "+91" + phoneDigits;
-  submitLeadToSheet({
+  const sheetResult = await submitLeadToSheet({
     name, designation, phone,
     score: lastScore,
     timestamp: new Date().toISOString()
   });
+  if(!sheetResult.ok){
+    err.textContent="We couldn't save your details right now. Please try again.";
+    err.style.display="block";
+    return;
+  }
   document.getElementById("detailWrap").classList.remove("isLocked");
   document.getElementById("detailBlock").classList.remove("locked");
   document.getElementById("reportMeta").textContent = "General ATS readiness scan · Target role: " + designation;
