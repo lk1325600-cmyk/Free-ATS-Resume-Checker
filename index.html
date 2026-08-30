@@ -328,23 +328,34 @@ ul{padding-left:20px}
 
 <script>
 /* ============================================================
-   GOOGLE SHEET CONNECTION
-   Paste your Google Apps Script Web App URL between the quotes
-   below. See the setup instructions provided alongside this file.
-   Leave blank ("") to run the tool without saving leads anywhere.
+   GOOGLE FORM CONNECTION (lead capture)
+   Submissions go straight into the Google Form linked below,
+   which auto-populates its linked Google Sheet. No Apps Script
+   deployment or authorization required.
 ============================================================ */
-const SHEET_ENDPOINT = "https://script.google.com/macros/s/AKfycbxGnm6RQCJE_30-lnMJS7CHF5JcXLXwdkWxX-X9bCkUOejfNVqcRpQIlS6pDnzpxz4/exec";
+const FORM_ACTION_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdktUoVGxgTE9HplfbJrjLfZflvLpTCxZwxUmLKax0GhasOtA/formResponse";
+const FORM_ENTRIES = {
+  name:        "entry.444788494",
+  designation: "entry.1932503154",
+  phone:       "entry.1728020649",
+  score:       "entry.1115755263"
+};
 
 function submitLeadToSheet(payload){
-  if(!SHEET_ENDPOINT) return;
+  if(!FORM_ACTION_URL) return;
   try{
-    fetch(SHEET_ENDPOINT, {
+    const formData = new URLSearchParams();
+    formData.append(FORM_ENTRIES.name, payload.name);
+    formData.append(FORM_ENTRIES.designation, payload.designation);
+    formData.append(FORM_ENTRIES.phone, payload.phone);
+    formData.append(FORM_ENTRIES.score, payload.score);
+
+    fetch(FORM_ACTION_URL, {
       method: "POST",
       mode: "no-cors",
-      headers: {"Content-Type":"text/plain;charset=utf-8"},
-      body: JSON.stringify(payload)
+      body: formData
     });
-  }catch(err){ console.warn("Sheet submission failed silently:", err); }
+  }catch(err){ console.warn("Form submission failed silently:", err); }
 }
 
 const stop = new Set(("a an and are as at be been being by for from had has have he her his i if in into is it its me my of on or our she that the their them they this to was we were what when where which who will with you your aap aur hai ke ka ki ko se par mein main ek yeh ye hai ho hain tha thi the".split(/\s+/)));
