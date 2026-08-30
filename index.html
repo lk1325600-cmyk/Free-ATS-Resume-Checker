@@ -266,49 +266,60 @@ ul{padding-left:20px}
   <div class="leadModal">
     <div class="tagline">Scan complete</div>
     <h2>Your ATS score is ready 🎯</h2>
-    <p>Enter your details to unlock your full report — strengths, weaknesses and exactly what to fix.</p>
     <div class="leadScore"><span id="leadScoreVal">--</span><span>/100</span></div>
 
-    <label for="leadName">Your name</label>
-    <input id="leadName" placeholder="Enter your name">
+    <div id="leadStep1">
+      <p>Enter your details to unlock your full report — strengths, weaknesses and exactly what to fix.</p>
 
-    <label for="leadDesignation">Target designation / role you're applying for</label>
-    <input id="leadDesignation" placeholder="e.g. Sales Manager, Business Development Executive">
+      <label for="leadName">Your name</label>
+      <input id="leadName" placeholder="Enter your name">
 
-    <label for="leadPhone">WhatsApp number</label>
-    <div class="phoneRow">
-      <div class="phonePrefix">+91</div>
-      <input id="leadPhone" type="tel" inputmode="numeric" placeholder="98765 43210" maxlength="10">
+      <label for="leadDesignation">Target designation / role you're applying for</label>
+      <input id="leadDesignation" placeholder="e.g. Sales Manager, Business Development Executive">
+
+      <label for="leadPhone">WhatsApp number</label>
+      <div class="phoneRow">
+        <div class="phonePrefix">+91</div>
+        <input id="leadPhone" type="tel" inputmode="numeric" placeholder="98765 43210" maxlength="10">
+      </div>
+
+      <label for="leadExperience">Years of experience</label>
+      <select id="leadExperience">
+        <option value="">Select experience</option>
+        <option value="0-5 Years">0-5 years</option>
+        <option value="6-10 Years">6-10 years</option>
+        <option value="11-15 Years">11-15 years</option>
+        <option value="15+ Years">15+ years</option>
+      </select>
+
+      <label for="leadCTC">Current CTC (optional)</label>
+      <select id="leadCTC">
+        <option value="">Prefer not to say</option>
+        <option value="0-5 Lakhs">0-5 lakh</option>
+        <option value="6-10 Lakhs">6-10 lakh</option>
+        <option value="11-15 Lakhs">11-15 lakh</option>
+        <option value="15+ Lakhs">15+ lakh</option>
+      </select>
+
+      <div class="fieldErr" id="leadErr">Please fill in your name, target designation, WhatsApp number and years of experience.</div>
+
+      <label class="consent"><input id="leadConsent" type="checkbox"> <span>I agree to be contacted on WhatsApp regarding my resume assessment and relevant career services.</span></label>
+      <div class="actions">
+        <button id="continueToForm" class="block teal">Continue</button>
+      </div>
+      <div class="actions" style="margin-top:0">
+        <button class="secondary block" id="skipLead">View Basic Score Only</button>
+      </div>
+      <div class="leadNote">We use your WhatsApp number only to send your detailed report and relevant opportunities.</div>
     </div>
 
-    <label for="leadExperience">Years of experience</label>
-    <select id="leadExperience">
-      <option value="">Select experience</option>
-      <option value="0-5 Years">0-5 years</option>
-      <option value="6-10 Years">6-10 years</option>
-      <option value="11-15 Years">11-15 years</option>
-      <option value="15+ Years">15+ years</option>
-    </select>
-
-    <label for="leadCTC">Current CTC (optional)</label>
-    <select id="leadCTC">
-      <option value="">Prefer not to say</option>
-      <option value="0-5 Lakhs">0-5 lakh</option>
-      <option value="6-10 Lakhs">6-10 lakh</option>
-      <option value="11-15 Lakhs">11-15 lakh</option>
-      <option value="15+ Lakhs">15+ lakh</option>
-    </select>
-
-    <div class="fieldErr" id="leadErr">Please fill in your name, target designation, WhatsApp number and years of experience.</div>
-
-    <label class="consent"><input id="leadConsent" type="checkbox"> <span>I agree to be contacted on WhatsApp regarding my resume assessment and relevant career services.</span></label>
-    <div class="actions">
-      <button id="unlockReport" class="block teal">Unlock My ATS Report</button>
+    <div id="leadStep2" class="hidden">
+      <p style="margin-bottom:10px">Almost there — hit <b>Submit</b> inside the form below to save your details, then click "I've Submitted" to unlock your report.</p>
+      <iframe id="gformFrame" src="" width="100%" height="520" frameborder="0" style="border:1px solid var(--border);border-radius:10px" title="Lead capture form"></iframe>
+      <div class="actions">
+        <button id="confirmSubmitted" class="block teal">I've Submitted — Unlock My Report</button>
+      </div>
     </div>
-    <div class="actions" style="margin-top:0">
-      <button class="secondary block" id="skipLead">View Basic Score Only</button>
-    </div>
-    <div class="leadNote">We use your WhatsApp number only to send your detailed report and relevant opportunities.</div>
   </div>
 </div>
 
@@ -346,11 +357,13 @@ ul{padding-left:20px}
 <script>
 /* ============================================================
    GOOGLE FORM CONNECTION (lead capture)
-   Submissions go straight into the Google Form linked below,
-   which auto-populates its linked Google Sheet. No Apps Script
-   deployment or authorization required.
+   We embed the real Google Form, pre-filled, inside the modal.
+   The visitor clicks the Form's own Submit button, which
+   guarantees Google's anti-spam tokens are present and the
+   response actually saves with data (unlike a raw background
+   POST to /formResponse, which Google silently discards).
 ============================================================ */
-const FORM_ACTION_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdktUoVGxgTE9HplfbJrjLfZflvLpTCxZwxUmLKax0GhasOtA/formResponse";
+const FORM_VIEW_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdktUoVGxgTE9HplfbJrjLfZflvLpTCxZwxUmLKax0GhasOtA/viewform";
 const FORM_ENTRIES = {
   name:        "entry.444788494",
   designation: "entry.1932503154",
@@ -360,23 +373,16 @@ const FORM_ENTRIES = {
   ctc:         "entry.76742459"
 };
 
-function submitLeadToSheet(payload){
-  if(!FORM_ACTION_URL) return;
-  try{
-    const formData = new URLSearchParams();
-    formData.append(FORM_ENTRIES.name, payload.name);
-    formData.append(FORM_ENTRIES.designation, payload.designation);
-    formData.append(FORM_ENTRIES.phone, payload.phone);
-    formData.append(FORM_ENTRIES.score, payload.score);
-    formData.append(FORM_ENTRIES.experience, payload.experience);
-    if(payload.ctc) formData.append(FORM_ENTRIES.ctc, payload.ctc);
-
-    fetch(FORM_ACTION_URL, {
-      method: "POST",
-      mode: "no-cors",
-      body: formData
-    });
-  }catch(err){ console.warn("Form submission failed silently:", err); }
+function buildEmbedUrl(payload){
+  const params = new URLSearchParams();
+  params.set("embedded", "true");
+  params.set(FORM_ENTRIES.name, payload.name);
+  params.set(FORM_ENTRIES.designation, payload.designation);
+  params.set(FORM_ENTRIES.phone, payload.phone);
+  params.set(FORM_ENTRIES.score, payload.score);
+  params.set(FORM_ENTRIES.experience, payload.experience);
+  if(payload.ctc) params.set(FORM_ENTRIES.ctc, payload.ctc);
+  return FORM_VIEW_URL + "?" + params.toString();
 }
 
 const stop = new Set(("a an and are as at be been being by for from had has have he her his i if in into is it its me my of on or our she that the their them they this to was we were what when where which who will with you your aap aur hai ke ka ki ko se par mein main ek yeh ye hai ho hain tha thi the".split(/\s+/)));
@@ -565,7 +571,9 @@ function runScan(){
 document.getElementById("analyze").onclick=runScan;
 
 /* ---------------- lead capture ---------------- */
-function unlockReport(){
+let capturedDesignation = "";
+
+function goToStep2(){
   const name=document.getElementById("leadName").value.trim();
   const designation=document.getElementById("leadDesignation").value.trim();
   const phoneDigits=document.getElementById("leadPhone").value.trim();
@@ -585,21 +593,30 @@ function unlockReport(){
   }
   err.style.display="none";
   const phone = "+91" + phoneDigits;
-  submitLeadToSheet({
-    name, designation, phone, experience, ctc,
-    score: lastScore,
-    timestamp: new Date().toISOString()
-  });
+  capturedDesignation = designation;
+
+  const embedUrl = buildEmbedUrl({ name, designation, phone, experience, ctc, score: lastScore });
+  document.getElementById("gformFrame").src = embedUrl;
+  document.getElementById("leadStep1").classList.add("hidden");
+  document.getElementById("leadStep2").classList.remove("hidden");
+}
+
+function finishUnlock(){
   document.getElementById("detailWrap").classList.remove("isLocked");
   document.getElementById("detailBlock").classList.remove("locked");
-  document.getElementById("reportMeta").textContent = "General ATS readiness scan · Target role: " + designation;
+  document.getElementById("reportMeta").textContent = "General ATS readiness scan · Target role: " + capturedDesignation;
   document.getElementById("leadOverlay").style.display="none";
   document.getElementById("results").scrollIntoView({behavior:"smooth", block:"start"});
+  // reset modal back to step 1 for next time it's opened
+  document.getElementById("leadStep1").classList.remove("hidden");
+  document.getElementById("leadStep2").classList.add("hidden");
 }
+
 document.getElementById("leadPhone").addEventListener("input",e=>{
   e.target.value = e.target.value.replace(/\D/g,"").slice(0,10);
 });
-document.getElementById("unlockReport").onclick=unlockReport;
+document.getElementById("continueToForm").onclick=goToStep2;
+document.getElementById("confirmSubmitted").onclick=finishUnlock;
 document.getElementById("skipLead").onclick=()=>{
   document.getElementById("leadOverlay").style.display="none";
   document.getElementById("results").scrollIntoView({behavior:"smooth", block:"start"});
