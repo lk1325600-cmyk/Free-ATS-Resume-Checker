@@ -207,7 +207,6 @@ ul{padding-left:20px}
 
     <div class="actions">
       <button id="analyze">Scan My Resume</button>
-      <button class="secondary" id="sample">Load Sample</button>
       <button class="secondary" id="clear">Clear</button>
     </div>
   </div>
@@ -282,7 +281,25 @@ ul{padding-left:20px}
       <input id="leadPhone" type="tel" inputmode="numeric" placeholder="98765 43210" maxlength="10">
     </div>
 
-    <div class="fieldErr" id="leadErr">Please fill in your name, target designation and WhatsApp number.</div>
+    <label for="leadExperience">Years of experience</label>
+    <select id="leadExperience">
+      <option value="">Select experience</option>
+      <option value="0-5 years">0-5 years</option>
+      <option value="6-10 years">6-10 years</option>
+      <option value="11-15 years">11-15 years</option>
+      <option value="15+ years">15+ years</option>
+    </select>
+
+    <label for="leadCTC">Current CTC (optional)</label>
+    <select id="leadCTC">
+      <option value="">Prefer not to say</option>
+      <option value="0-5 lakh">0-5 lakh</option>
+      <option value="6-10 lakh">6-10 lakh</option>
+      <option value="11-15 lakh">11-15 lakh</option>
+      <option value="15+ lakh">15+ lakh</option>
+    </select>
+
+    <div class="fieldErr" id="leadErr">Please fill in your name, target designation, WhatsApp number and years of experience.</div>
 
     <label class="consent"><input id="leadConsent" type="checkbox"> <span>I agree to be contacted on WhatsApp regarding my resume assessment and relevant career services.</span></label>
     <div class="actions">
@@ -338,7 +355,9 @@ const FORM_ENTRIES = {
   name:        "entry.444788494",
   designation: "entry.1932503154",
   phone:       "entry.1728020649",
-  score:       "entry.1115755263"
+  score:       "entry.1115755263",
+  experience:  "entry.1349905442",
+  ctc:         "entry.76742459"
 };
 
 function submitLeadToSheet(payload){
@@ -349,6 +368,8 @@ function submitLeadToSheet(payload){
     formData.append(FORM_ENTRIES.designation, payload.designation);
     formData.append(FORM_ENTRIES.phone, payload.phone);
     formData.append(FORM_ENTRIES.score, payload.score);
+    formData.append(FORM_ENTRIES.experience, payload.experience);
+    if(payload.ctc) formData.append(FORM_ENTRIES.ctc, payload.ctc);
 
     fetch(FORM_ACTION_URL, {
       method: "POST",
@@ -548,10 +569,12 @@ function unlockReport(){
   const name=document.getElementById("leadName").value.trim();
   const designation=document.getElementById("leadDesignation").value.trim();
   const phoneDigits=document.getElementById("leadPhone").value.trim();
+  const experience=document.getElementById("leadExperience").value;
+  const ctc=document.getElementById("leadCTC").value;
   const consent=document.getElementById("leadConsent").checked;
   const err=document.getElementById("leadErr");
-  if(!name || !designation || !phoneDigits || !consent){
-    err.textContent="Please fill in your name, target designation and WhatsApp number.";
+  if(!name || !designation || !phoneDigits || !experience || !consent){
+    err.textContent="Please fill in your name, target designation, WhatsApp number and years of experience.";
     err.style.display="block";
     return;
   }
@@ -563,7 +586,7 @@ function unlockReport(){
   err.style.display="none";
   const phone = "+91" + phoneDigits;
   submitLeadToSheet({
-    name, designation, phone,
+    name, designation, phone, experience, ctc,
     score: lastScore,
     timestamp: new Date().toISOString()
   });
@@ -619,30 +642,6 @@ dropZone.addEventListener("click",(e)=>{ if(e.target.id!=="file") document.getEl
 dropZone.addEventListener("drop",e=>{ const f=e.dataTransfer.files[0]; if(f) handleFile(f); });
 
 document.getElementById("clear").onclick=()=>{document.getElementById("resume").value="";document.getElementById("results").classList.add("hidden")};
-document.getElementById("sample").onclick=()=>{
- document.getElementById("resume").value=`LOKESH KUMAR
-Gurgaon | +91 7452942999 | LK1325600@gmail.com
-
-PROFESSIONAL SUMMARY
-Sales professional with experience in insurance and healthcare sales, customer acquisition, lead conversion and target-driven environments.
-
-SKILLS
-Sales, Lead Generation, Lead Conversion, Customer Acquisition, B2C Sales, Insurance Sales, CRM, Negotiation, Upselling, Cross-selling, Customer Relationship Management, MS Excel
-
-PROFESSIONAL EXPERIENCE
-Health Assure Pvt. Ltd. — Senior Sales Executive | Feb 2022 – Mar 2024
-- Managed customer acquisition and sales activities for OPD plans.
-- Followed up with qualified leads and supported monthly sales targets.
-- Handled customer queries and explained product benefits.
-
-Policybazaar.com — Insurance Sales Expert | Dec 2019 – Jan 2022
-- Managed insurance sales conversations and customer follow-ups.
-- Converted qualified prospects into customers.
-- Maintained sales pipeline and worked toward monthly targets.
-
-EDUCATION
-B.A., Delhi University — 2021`;
-};
 </script>
 </body>
 </html>
