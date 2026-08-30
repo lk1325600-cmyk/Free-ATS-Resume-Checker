@@ -307,8 +307,7 @@ ul{padding-left:20px}
       <div class="scan-beam"></div>
     </div>
 
-    <div class="timer mono" id="timer" aria-live="polite">01:30
-</div>
+    <div class="timer mono" id="timer" aria-live="polite">00:59</div>
     <div class="timerLabel">estimated time remaining</div>
     <div class="progress"><span id="progressBar"></span></div>
     <div class="scanStatus" id="scanStatus">Reading resume structure...</div>
@@ -327,50 +326,25 @@ ul{padding-left:20px}
   </div>
 </div>
 
-
-<!-- Hidden form used to submit leads to Google Apps Script without browser CORS blocking. -->
-<iframe name="sheetSubmitFrame" id="sheetSubmitFrame" style="display:none" aria-hidden="true"></iframe>
-<form id="sheetSubmitForm" method="POST" target="sheetSubmitFrame" style="display:none">
-  <input type="hidden" name="name" id="sheetNameField">
-  <input type="hidden" name="designation" id="sheetDesignationField">
-  <input type="hidden" name="phone" id="sheetPhoneField">
-  <input type="hidden" name="score" id="sheetScoreField">
-  <input type="hidden" name="consent" id="sheetConsentField">
-  <input type="hidden" name="timestamp" id="sheetTimestampField">
-</form>
-
 <script>
 /* ============================================================
    GOOGLE SHEET CONNECTION
-   Your Google Apps Script Web App URL is configured below.
-   Leads are submitted using a standard form POST to avoid browser CORS issues.
+   Paste your Google Apps Script Web App URL between the quotes
+   below. See the setup instructions provided alongside this file.
    Leave blank ("") to run the tool without saving leads anywhere.
 ============================================================ */
-const SHEET_ENDPOINT = "https://script.google.com/macros/s/AKfycbzKavssD2xjYhzl7poZlONVP14m1uYugx-w5F_I5Rfg5zWEPVIDOnDOeW1R2W2ek9YUqA/exec";
+const SHEET_ENDPOINT = "https://script.google.com/macros/s/AKfycbxNyoQX_7xM7GrNrXZ1MNL-s1IOi7gZM2jrSm9RjTnKWilWEpWyxNc-q3ODaLlJyl87hw/exec";
 
 function submitLeadToSheet(payload){
-  if(!SHEET_ENDPOINT) return false;
-
+  if(!SHEET_ENDPOINT) return;
   try{
-    const iframe = document.getElementById("sheetSubmitFrame");
-    const form = document.getElementById("sheetSubmitForm");
-
-    document.getElementById("sheetNameField").value = payload.name || "";
-    document.getElementById("sheetDesignationField").value = payload.designation || "";
-    document.getElementById("sheetPhoneField").value = payload.phone || "";
-    document.getElementById("sheetScoreField").value = String(payload.score ?? "");
-    document.getElementById("sheetConsentField").value = "Yes";
-    document.getElementById("sheetTimestampField").value = payload.timestamp || new Date().toISOString();
-
-    form.action = SHEET_ENDPOINT;
-    form.target = iframe.name;
-    form.submit();
-
-    return true;
-  }catch(err){
-    console.error("Google Sheet submission failed:", err);
-    return false;
-  }
+    fetch(SHEET_ENDPOINT, {
+      method: "POST",
+      mode: "no-cors",
+      headers: {"Content-Type":"text/plain;charset=utf-8"},
+      body: JSON.stringify(payload)
+    });
+  }catch(err){ console.warn("Sheet submission failed silently:", err); }
 }
 
 const stop = new Set(("a an and are as at be been being by for from had has have he her his i if in into is it its me my of on or our she that the their them they this to was we were what when where which who will with you your aap aur hai ke ka ki ko se par mein main ek yeh ye hai ho hain tha thi the".split(/\s+/)));
@@ -577,23 +551,11 @@ function unlockReport(){
   }
   err.style.display="none";
   const phone = "+91" + phoneDigits;
-  const leadPayload = {
+  submitLeadToSheet({
     name, designation, phone,
     score: lastScore,
     timestamp: new Date().toISOString()
-  };
-  const submitted = submitLeadToSheet(leadPayload);
-
-  // Keep a local copy for troubleshooting/recovery.
-  const localLeads = JSON.parse(localStorage.getItem("ats_leads") || "[]");
-  localLeads.push(leadPayload);
-  localStorage.setItem("ats_leads", JSON.stringify(localLeads));
-
-  if(!submitted){
-    err.textContent="We couldn't submit your details. Please try again.";
-    err.style.display="block";
-    return;
-  }
+  });
   document.getElementById("detailWrap").classList.remove("isLocked");
   document.getElementById("detailBlock").classList.remove("locked");
   document.getElementById("reportMeta").textContent = "General ATS readiness scan · Target role: " + designation;
