@@ -232,14 +232,13 @@ ul{padding-left:20px}
 
 /* ---------- FLOATING PLUS FAB (mid-right, expands on hover) ---------- */
 @keyframes fabPulse{0%,100%{box-shadow:0 10px 30px rgba(11,18,32,.26),0 0 0 0 rgba(242,169,59,.45)}50%{box-shadow:0 10px 30px rgba(11,18,32,.26),0 0 0 12px rgba(242,169,59,0)}}
-.floatingResumeCta{position:fixed;right:18px;top:50%;transform:translateY(-50%);z-index:9998;display:flex;align-items:center;height:56px;width:56px;padding:0;border:0;border-radius:999px;background:linear-gradient(135deg,var(--amber),#F7C066);color:#3A2404;box-shadow:0 10px 30px rgba(11,18,32,.26);white-space:nowrap;overflow:hidden;cursor:pointer;transition:width .35s cubic-bezier(.4,0,.2,1),box-shadow .25s ease;animation:fabPulse 2.6s ease-in-out infinite}
+.floatingResumeCta{position:fixed;right:18px;top:50%;transform:translateY(-50%);z-index:9998;display:flex;align-items:center;height:56px;padding:0 22px 0 0;border:0;border-radius:999px;background:linear-gradient(135deg,var(--amber),#F7C066);color:#3A2404;box-shadow:0 10px 30px rgba(11,18,32,.26);white-space:nowrap;cursor:pointer;transition:box-shadow .25s ease,transform .2s ease;animation:fabPulse 2.6s ease-in-out infinite}
 .floatingResumeCta .fabIcon{flex:0 0 56px;height:56px;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;line-height:1;transition:transform .3s ease}
-.floatingResumeCta .fabLabel{max-width:0;opacity:0;overflow:hidden;font-size:13.5px;font-weight:700;letter-spacing:.1px;transition:max-width .35s ease,opacity .25s ease,padding .35s ease;padding-right:0;white-space:nowrap}
-.floatingResumeCta:hover,.floatingResumeCta:focus-visible{width:236px;box-shadow:0 16px 38px rgba(11,18,32,.34);animation:none}
-.floatingResumeCta:hover .fabLabel,.floatingResumeCta:focus-visible .fabLabel{max-width:190px;opacity:1;padding-right:18px}
+.floatingResumeCta .fabLabel{font-size:13.5px;font-weight:700;letter-spacing:.1px;white-space:nowrap}
+.floatingResumeCta:hover,.floatingResumeCta:focus-visible{box-shadow:0 16px 38px rgba(11,18,32,.34);transform:translateY(-50%) scale(1.04);animation:none}
 .floatingResumeCta:hover .fabIcon{transform:rotate(90deg)}
 .floatingResumeCta.hidden{display:none!important}
-@media(max-width:520px){.floatingResumeCta{right:12px;height:50px;width:50px}.floatingResumeCta .fabIcon{flex-basis:50px;height:50px;font-size:24px}.floatingResumeCta:hover,.floatingResumeCta:focus-visible{width:210px}}
+@media(max-width:520px){.floatingResumeCta{right:10px;height:48px;padding-right:16px}.floatingResumeCta .fabIcon{flex-basis:48px;height:48px;font-size:22px}.floatingResumeCta .fabLabel{font-size:12px}}
 
 /* ---------- KEYWORD PAYWALL (missing/suggested keywords) ---------- */
 .kwLockWrap{position:relative;border:1.4px dashed rgba(11,18,32,.14);border-radius:12px;padding:6px}
@@ -259,9 +258,9 @@ ul{padding-left:20px}
 </style>
 </head>
 <body>
-<button id="floatingResumeCta" class="floatingResumeCta hidden" onclick="openPackages()" aria-label="Increase your ATS score">
+<button id="floatingResumeCta" class="floatingResumeCta hidden" onclick="openPackages()" aria-label="Fix your resume now">
   <span class="fabIcon" aria-hidden="true">+</span>
-  <span class="fabLabel">Increase Your Score</span>
+  <span class="fabLabel">Fix Your Resume Now</span>
 </button>
 <div class="siteHeader">
   <div class="siteHeader-inner">
@@ -735,7 +734,7 @@ function analyze(){
 }
 
 /* ---------------- scanning experience ---------------- */
-const TOTAL_SECONDS = 5; // 0:05
+const TOTAL_SECONDS = 60; // 1:00
 const STATUS_MESSAGES = [
   "Reading resume structure...",
   "Checking ATS-friendly formatting...",
@@ -835,6 +834,7 @@ function runScan(){
      document.getElementById("detailBlock").classList.add("locked");
      document.getElementById("leadScoreVal").textContent=lastScore;
      document.getElementById("leadOverlay").style.display="grid";
+     document.getElementById("floatingResumeCta").classList.remove("hidden");
    }
  },1000);
 }
