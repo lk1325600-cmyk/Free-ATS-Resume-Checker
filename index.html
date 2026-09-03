@@ -423,15 +423,6 @@ ul{padding-left:20px}
   </div>
 </div>
 
-<!-- Hidden Google Form submission target — submits once in the background, no second confirmation step -->
-<iframe name="hidden_iframe" id="hidden_iframe" style="display:none" aria-hidden="true"></iframe>
-<form id="gform" action="https://docs.google.com/forms/d/e/1FAIpQLSdktUoVGxgTE9HplfbJrjLfZflvLpTCxZwxUmLKax0GhasOtA/formResponse" method="POST" target="hidden_iframe" style="display:none">
-  <input type="text" name="entry.444788494" id="gf_name">
-  <input type="text" name="entry.1932503154" id="gf_designation">
-  <input type="text" name="entry.1728020649" id="gf_phone">
-  <input type="text" name="entry.1115755263" id="gf_score">
-</form>
-
 <!-- ================= ANALYSIS / SCANNING MODAL ================= -->
 <div class="analysisOverlay" id="analysisOverlay">
   <div class="analysisModal">
@@ -576,6 +567,77 @@ function submitToGoogleForm(payload){
   }catch(err){
     console.error("[CareerUp] Hidden-iframe fallback submission failed:", err);
   }
+}
+
+/* ============================================================
+   STEP 1 — SEPARATE Google Form for details AUTO-EXTRACTED
+   from the resume itself (silent, background, no popup).
+   This is a completely different form from the one above, which
+   only ever receives what the visitor manually types at Step 2
+   ("Unlock Full Report"). The Step 2 flow above is untouched.
+============================================================ */
+const GF1_ACTION_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdbIQ2e8zc_9JrCyITCCby9R2cdqQXa-7_XSF2V_9B-8_-X7A/formResponse";
+const GF1_ENTRY_IDS = {
+  name: "entry.1129223841",
+  phone: "entry.555311301",
+  email: "entry.1872801413",
+  designation: "entry.1288156229",
+  experience: "entry.1013943689"
+};
+
+function submitResumeExtractedLead(payload){
+  console.log("[CareerUp] Submitting Step 1 (resume-extracted) lead:", payload);
+
+  // Primary method: fetch() straight to the formResponse endpoint.
+  try{
+    const fd = new FormData();
+    fd.append(GF1_ENTRY_IDS.name, payload.name);
+    fd.append(GF1_ENTRY_IDS.phone, payload.phone);
+    fd.append(GF1_ENTRY_IDS.email, payload.email);
+    fd.append(GF1_ENTRY_IDS.designation, payload.designation);
+    fd.append(GF1_ENTRY_IDS.experience, payload.experience);
+    fetch(GF1_ACTION_URL, { method:"POST", mode:"no-cors", body: fd })
+      .then(()=>console.log("[CareerUp] Step 1 fetch() submission sent (response is opaque by design)."))
+      .catch(err=>console.error("[CareerUp] Step 1 fetch() submission failed:", err));
+  }catch(err){
+    console.error("[CareerUp] Could not build/send Step 1 fetch submission:", err);
+  }
+
+  // Backup method: dynamically build a hidden form + iframe and submit it,
+  // in case fetch to this domain is blocked in a particular browser/network.
+  try{
+    let iframe = document.getElementById("gform1_iframe");
+    if(!iframe){
+      iframe = document.createElement("iframe");
+      iframe.name = "gform1_iframe";
+      iframe.id = "gform1_iframe";
+      iframe.style.display = "none";
+      iframe.setAttribute("aria-hidden","true");
+      document.body.appendChild(iframe);
+    }
+    const form = document.createElement("form");
+    form.action = GF1_ACTION_URL;
+    form.method = "POST";
+    form.target = "gform1_iframe";
+    form.style.display = "none";
+    Object.entries(GF1_ENTRY_IDS).forEach(([key, entryId])=>{
+      const input = document.createElement("input");
+      input.type = "text";
+      input.name = entryId;
+      input.value = payload[key] || "";
+      form.appendChild(input);
+    });
+    document.body.appendChild(form);
+    form.submit();
+    setTimeout(()=>form.remove(), 3000);
+  }catch(err){
+    console.error("[CareerUp] Step 1 hidden-iframe fallback submission failed:", err);
+  }
+}
+
+function guessEmailFromText(text){
+  const match=(text||"").match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
+  return match ? match[0] : "";
 }
 
 const stop = new Set(("a an and are as at be been being by for from had has have he her his i if in into is it its me my of on or our she that the their them they this to was we were what when where which who will with you your aap aur hai ke ka ki ko se par mein main ek yeh ye hai ho hain tha thi the".split(/\s+/)));
@@ -730,7 +792,13 @@ function guessPhoneFromText(text){
 }
 
 function extractLeadFromResume(text){
-  return { name:guessNameFromText(text), designation:guessDesignationFromText(text), phone:guessPhoneFromText(text) };
+  return {
+    name:guessNameFromText(text),
+    designation:guessDesignationFromText(text),
+    phone:guessPhoneFromText(text),
+    email:guessEmailFromText(text),
+    experience:estimateExperience(text)
+  };
 }
 
 let lastScore = 0;
@@ -967,16 +1035,23 @@ document.getElementById("analyze").onclick=function(){
     return;
   }
 
-  // Silently pull name / target role / WhatsApp number from the resume text and
-  // capture the lead in the background — no popup shown to the visitor.
+  // Silently pull name / target role / WhatsApp number / email / experience from
+  // the resume text and capture the lead in the background — no popup shown.
   // Always fire this once consent + a valid resume are confirmed, even if some
   // fields can't be detected (use a clear fallback instead of skipping the row).
+  // Sent to its own dedicated Google Form — separate from the Step 2 form below.
   const extracted=extractLeadFromResume(resume);
   capturedName = extracted.name || "Not provided";
   capturedDesignation = extracted.designation || "Not provided";
   capturedPhone = extracted.phone ? ("+91"+extracted.phone) : "Not provided";
   console.log("[CareerUp] Step 1 extracted from resume:", extracted);
-  submitToGoogleForm({ name:capturedName, designation:capturedDesignation, phone:capturedPhone, score:"Pre-scan (Step 1 capture)" });
+  submitResumeExtractedLead({
+    name: capturedName,
+    phone: capturedPhone,
+    email: extracted.email || "Not provided",
+    designation: capturedDesignation,
+    experience: extracted.experience ? (extracted.experience+" years") : "Not provided"
+  });
 
   runScan();
 };
