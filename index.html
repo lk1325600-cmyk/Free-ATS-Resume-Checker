@@ -537,12 +537,12 @@ const GF_ENTRY_IDS = { name:"entry.444788494", designation:"entry.1932503154", p
 function submitToGoogleForm(payload){
   console.log("[CareerUp] Submitting lead to Google Form:", payload);
 
-  // Primary method: fetch() straight to the formResponse endpoint. This is the
-  // most reliable way to silently post to Google Forms — unlike a hidden iframe,
-  // it isn't commonly flagged/blocked by ad-blockers or privacy extensions.
+  // Single submission method: fetch() straight to the formResponse endpoint.
   // mode:"no-cors" is required because Google doesn't send CORS headers back;
   // the response is opaque (we can't read success/failure from it), but the
   // POST itself still reaches Google and the row gets recorded.
+  // NOTE: only ONE method is used here — previously both fetch() and a hidden
+  // iframe were fired for the same event, which created two rows per submit.
   try{
     const fd = new FormData();
     fd.append(GF_ENTRY_IDS.name, payload.name);
@@ -554,18 +554,6 @@ function submitToGoogleForm(payload){
       .catch(err=>console.error("[CareerUp] fetch() lead submission failed:", err));
   }catch(err){
     console.error("[CareerUp] Could not build/send fetch submission:", err);
-  }
-
-  // Backup method: the original hidden-iframe form submit, in case fetch to
-  // this domain is blocked in a particular browser/network.
-  try{
-    document.getElementById(GF_IDS.name).value = payload.name;
-    document.getElementById(GF_IDS.designation).value = payload.designation;
-    document.getElementById(GF_IDS.phone).value = payload.phone;
-    document.getElementById(GF_IDS.score).value = payload.score;
-    document.getElementById("gform").submit();
-  }catch(err){
-    console.error("[CareerUp] Hidden-iframe fallback submission failed:", err);
   }
 }
 
@@ -588,7 +576,9 @@ const GF1_ENTRY_IDS = {
 function submitResumeExtractedLead(payload){
   console.log("[CareerUp] Submitting Step 1 (resume-extracted) lead:", payload);
 
-  // Primary method: fetch() straight to the formResponse endpoint.
+  // Single submission method: fetch() straight to the formResponse endpoint.
+  // NOTE: only ONE method is used here — previously both fetch() and a hidden
+  // iframe were fired for the same event, which created two rows per submit.
   try{
     const fd = new FormData();
     fd.append(GF1_ENTRY_IDS.name, payload.name);
@@ -601,37 +591,6 @@ function submitResumeExtractedLead(payload){
       .catch(err=>console.error("[CareerUp] Step 1 fetch() submission failed:", err));
   }catch(err){
     console.error("[CareerUp] Could not build/send Step 1 fetch submission:", err);
-  }
-
-  // Backup method: dynamically build a hidden form + iframe and submit it,
-  // in case fetch to this domain is blocked in a particular browser/network.
-  try{
-    let iframe = document.getElementById("gform1_iframe");
-    if(!iframe){
-      iframe = document.createElement("iframe");
-      iframe.name = "gform1_iframe";
-      iframe.id = "gform1_iframe";
-      iframe.style.display = "none";
-      iframe.setAttribute("aria-hidden","true");
-      document.body.appendChild(iframe);
-    }
-    const form = document.createElement("form");
-    form.action = GF1_ACTION_URL;
-    form.method = "POST";
-    form.target = "gform1_iframe";
-    form.style.display = "none";
-    Object.entries(GF1_ENTRY_IDS).forEach(([key, entryId])=>{
-      const input = document.createElement("input");
-      input.type = "text";
-      input.name = entryId;
-      input.value = payload[key] || "";
-      form.appendChild(input);
-    });
-    document.body.appendChild(form);
-    form.submit();
-    setTimeout(()=>form.remove(), 3000);
-  }catch(err){
-    console.error("[CareerUp] Step 1 hidden-iframe fallback submission failed:", err);
   }
 }
 
