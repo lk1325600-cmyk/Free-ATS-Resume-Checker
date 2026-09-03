@@ -540,13 +540,42 @@ ul{padding-left:20px}
    click, one save.
 ============================================================ */
 const GF_IDS = { name:"gf_name", designation:"gf_designation", phone:"gf_phone", score:"gf_score" };
+const GF_ACTION_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdktUoVGxgTE9HplfbJrjLfZflvLpTCxZwxUmLKax0GhasOtA/formResponse";
+const GF_ENTRY_IDS = { name:"entry.444788494", designation:"entry.1932503154", phone:"entry.1728020649", score:"entry.1115755263" };
 
 function submitToGoogleForm(payload){
-  document.getElementById(GF_IDS.name).value = payload.name;
-  document.getElementById(GF_IDS.designation).value = payload.designation;
-  document.getElementById(GF_IDS.phone).value = payload.phone;
-  document.getElementById(GF_IDS.score).value = payload.score;
-  document.getElementById("gform").submit();
+  console.log("[CareerUp] Submitting lead to Google Form:", payload);
+
+  // Primary method: fetch() straight to the formResponse endpoint. This is the
+  // most reliable way to silently post to Google Forms — unlike a hidden iframe,
+  // it isn't commonly flagged/blocked by ad-blockers or privacy extensions.
+  // mode:"no-cors" is required because Google doesn't send CORS headers back;
+  // the response is opaque (we can't read success/failure from it), but the
+  // POST itself still reaches Google and the row gets recorded.
+  try{
+    const fd = new FormData();
+    fd.append(GF_ENTRY_IDS.name, payload.name);
+    fd.append(GF_ENTRY_IDS.designation, payload.designation);
+    fd.append(GF_ENTRY_IDS.phone, payload.phone);
+    fd.append(GF_ENTRY_IDS.score, payload.score);
+    fetch(GF_ACTION_URL, { method:"POST", mode:"no-cors", body: fd })
+      .then(()=>console.log("[CareerUp] fetch() lead submission sent (response is opaque by design)."))
+      .catch(err=>console.error("[CareerUp] fetch() lead submission failed:", err));
+  }catch(err){
+    console.error("[CareerUp] Could not build/send fetch submission:", err);
+  }
+
+  // Backup method: the original hidden-iframe form submit, in case fetch to
+  // this domain is blocked in a particular browser/network.
+  try{
+    document.getElementById(GF_IDS.name).value = payload.name;
+    document.getElementById(GF_IDS.designation).value = payload.designation;
+    document.getElementById(GF_IDS.phone).value = payload.phone;
+    document.getElementById(GF_IDS.score).value = payload.score;
+    document.getElementById("gform").submit();
+  }catch(err){
+    console.error("[CareerUp] Hidden-iframe fallback submission failed:", err);
+  }
 }
 
 const stop = new Set(("a an and are as at be been being by for from had has have he her his i if in into is it its me my of on or our she that the their them they this to was we were what when where which who will with you your aap aur hai ke ka ki ko se par mein main ek yeh ye hai ho hain tha thi the".split(/\s+/)));
@@ -946,6 +975,7 @@ document.getElementById("analyze").onclick=function(){
   capturedName = extracted.name || "Not provided";
   capturedDesignation = extracted.designation || "Not provided";
   capturedPhone = extracted.phone ? ("+91"+extracted.phone) : "Not provided";
+  console.log("[CareerUp] Step 1 extracted from resume:", extracted);
   submitToGoogleForm({ name:capturedName, designation:capturedDesignation, phone:capturedPhone, score:"Pre-scan (Step 1 capture)" });
 
   runScan();
