@@ -258,7 +258,7 @@ ul{padding-left:20px}
 </style>
 </head>
 <body>
-<button id="floatingResumeCta" class="floatingResumeCta hidden" onclick="openPackages()" aria-label="Fix your resume now">
+<button id="floatingResumeCta" class="floatingResumeCta" onclick="openPackages()" aria-label="Fix your resume now">
   <span class="fabIcon" aria-hidden="true">+</span>
   <span class="fabLabel">Fix Your Resume Now</span>
 </button>
@@ -314,6 +314,8 @@ ul{padding-left:20px}
       <button id="analyze">Scan My Resume</button>
       <button class="secondary" id="clear">Clear</button>
     </div>
+    <label class="consent"><input id="scanConsent" type="checkbox"> <span>I agree that CareerUp may contact me on WhatsApp and/or by phone call regarding my resume assessment and related career upgrade services — this consent is given voluntarily and can be withdrawn at any time.</span></label>
+    <div class="fieldErr" id="scanConsentErr">Please accept the consent checkbox to continue.</div>
   </div>
 
   <div id="results" class="results hidden">
@@ -649,6 +651,59 @@ function showDocIntel(info){
  : `<b>⚠ ${esc(info.type.replace(/^./,c=>c.toUpperCase()))}</b><span>${esc(info.reason)} Please upload a resume/CV to continue.</span>`;
 }
 
+/* ---------------- auto lead extraction from resume text ---------------- */
+const TITLE_KEYWORDS=["manager","executive","engineer","developer","analyst","consultant","specialist","director","team lead","lead","associate","officer","head","coordinator","administrator","designer","architect","representative","supervisor","intern","president","vice president","founder","strategist","recruiter","accountant","technician","advisor","controller","planner"];
+const RESUME_HEADING_WORDS=["resume","curriculum vitae","cv","bio data","biodata","profile","portfolio","personal details"];
+
+function guessNameFromText(text){
+  const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).slice(0,8);
+  for(const line of lines){
+    const lower=line.toLowerCase();
+    if(RESUME_HEADING_WORDS.some(h=>lower===h||lower.startsWith(h+" "))) continue;
+    if(/[@\d]/.test(line)) continue; // skip lines containing an email or phone/number
+    const wordCount=line.split(/\s+/).filter(Boolean).length;
+    if(wordCount>=2 && wordCount<=4 && line.length<=40 && /^[A-Za-z.'\s-]+$/.test(line)){
+      return line.replace(/\s+/g," ").trim();
+    }
+  }
+  const emailMatch=text.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
+  if(emailMatch){
+    const local=emailMatch[0].split("@")[0].replace(/[0-9]+/g,"").split(/[._-]+/).filter(Boolean);
+    if(local.length) return local.map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(" ");
+  }
+  return "";
+}
+
+function guessDesignationFromText(text){
+  const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).slice(0,15);
+  for(const line of lines){
+    const lower=line.toLowerCase();
+    if(TITLE_KEYWORDS.some(k=>lower.includes(k)) && line.length<=60 && !/@/.test(line)){
+      return line.replace(/[|,;].*$/,"").trim();
+    }
+  }
+  const role=detectRoleTerms(text);
+  if(role && role.role && role.role!=="general") return role.role.charAt(0).toUpperCase()+role.role.slice(1);
+  return "";
+}
+
+function guessPhoneFromText(text){
+  const matches=text.match(/(\+?\d[\d ()-]{8,}\d)/g)||[];
+  for(const m of matches){
+    const last10=m.replace(/\D/g,"").slice(-10);
+    if(last10.length===10 && /^[6-9]/.test(last10)) return last10;
+  }
+  for(const m of matches){
+    const last10=m.replace(/\D/g,"").slice(-10);
+    if(last10.length===10) return last10;
+  }
+  return "";
+}
+
+function extractLeadFromResume(text){
+  return { name:guessNameFromText(text), designation:guessDesignationFromText(text), phone:guessPhoneFromText(text) };
+}
+
 let lastScore = 0;
 
 function analyze(){
@@ -834,16 +889,52 @@ function runScan(){
      document.getElementById("detailBlock").classList.add("locked");
      document.getElementById("leadScoreVal").textContent=lastScore;
      document.getElementById("leadOverlay").style.display="grid";
-     document.getElementById("floatingResumeCta").classList.remove("hidden");
    }
  },1000);
 }
-document.getElementById("analyze").onclick=runScan;
-
 /* ---------------- lead capture (single step) ---------------- */
 let capturedDesignation = "";
 let capturedName = "";
 let capturedPhone = "";
+
+/* ---------------- consent-gated scan with silent background lead capture ---------------- */
+document.getElementById("scanConsent").addEventListener("change",()=>{
+  document.getElementById("scanConsentErr").style.display="none";
+});
+
+document.getElementById("analyze").onclick=function(){
+  const resume=document.getElementById("resume").value.trim();
+  if(!resume){alert("Please upload or paste your resume.");return}
+
+  const consentBox=document.getElementById("scanConsent");
+  const consentErr=document.getElementById("scanConsentErr");
+  if(!consentBox.checked){
+    consentErr.style.display="block";
+    consentBox.focus();
+    return;
+  }
+  consentErr.style.display="none";
+
+  // Validate it's a genuine resume before scanning.
+  documentIntel=classifyDocument(resume, window.currentFileName||"");
+  showDocIntel(documentIntel);
+  if(!documentIntel.valid){
+    alert("Uploaded Doc is not a resume, Please upload the different file");
+    return;
+  }
+
+  // Silently pull name / target role / WhatsApp number from the resume text and
+  // capture the lead in the background — no popup shown to the visitor.
+  const extracted=extractLeadFromResume(resume);
+  if(extracted.name) capturedName=extracted.name;
+  if(extracted.designation) capturedDesignation=extracted.designation;
+  if(extracted.phone) capturedPhone="+91"+extracted.phone;
+  if(capturedName || capturedDesignation || capturedPhone){
+    submitToGoogleForm({ name:capturedName, designation:capturedDesignation, phone:capturedPhone, score:"" });
+  }
+
+  runScan();
+};
 
 function handleSubmitLead(){
   const name=document.getElementById("leadName").value.trim();
