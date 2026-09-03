@@ -888,6 +888,7 @@ function runScan(){
      document.getElementById("detailWrap").classList.add("isLocked");
      document.getElementById("detailBlock").classList.add("locked");
      document.getElementById("leadScoreVal").textContent=lastScore;
+     prefillLeadForm();
      document.getElementById("leadOverlay").style.display="grid";
    }
  },1000);
@@ -896,6 +897,20 @@ function runScan(){
 let capturedDesignation = "";
 let capturedName = "";
 let capturedPhone = "";
+
+// Pre-fill the Step 2 (Unlock Full Report) form with whatever we silently
+// captured from the resume in Step 1, so the visitor doesn't retype it.
+// Whatever the visitor confirms/edits here and submits becomes the final,
+// authoritative record — it replaces the Step 1 values in the app's own state.
+function prefillLeadForm(){
+  const nameField=document.getElementById("leadName");
+  const desigField=document.getElementById("leadDesignation");
+  const phoneField=document.getElementById("leadPhone");
+  if(nameField) nameField.value = (capturedName && capturedName!=="Not provided") ? capturedName : "";
+  if(desigField) desigField.value = (capturedDesignation && capturedDesignation!=="Not provided") ? capturedDesignation : "";
+  const digits=(capturedPhone||"").replace(/\D/g,"").slice(-10);
+  if(phoneField) phoneField.value = (digits.length===10) ? digits : "";
+}
 
 /* ---------------- consent-gated scan with silent background lead capture ---------------- */
 document.getElementById("scanConsent").addEventListener("change",()=>{
@@ -925,13 +940,13 @@ document.getElementById("analyze").onclick=function(){
 
   // Silently pull name / target role / WhatsApp number from the resume text and
   // capture the lead in the background — no popup shown to the visitor.
+  // Always fire this once consent + a valid resume are confirmed, even if some
+  // fields can't be detected (use a clear fallback instead of skipping the row).
   const extracted=extractLeadFromResume(resume);
-  if(extracted.name) capturedName=extracted.name;
-  if(extracted.designation) capturedDesignation=extracted.designation;
-  if(extracted.phone) capturedPhone="+91"+extracted.phone;
-  if(capturedName || capturedDesignation || capturedPhone){
-    submitToGoogleForm({ name:capturedName, designation:capturedDesignation, phone:capturedPhone, score:"" });
-  }
+  capturedName = extracted.name || "Not provided";
+  capturedDesignation = extracted.designation || "Not provided";
+  capturedPhone = extracted.phone ? ("+91"+extracted.phone) : "Not provided";
+  submitToGoogleForm({ name:capturedName, designation:capturedDesignation, phone:capturedPhone, score:"Pre-scan (Step 1 capture)" });
 
   runScan();
 };
