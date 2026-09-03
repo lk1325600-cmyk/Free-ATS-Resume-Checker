@@ -403,6 +403,9 @@ ul{padding-left:20px}
       <label for="leadDesignation">Target designation / role you're applying for</label>
       <input id="leadDesignation" placeholder="e.g. Sales Manager, Business Development Executive">
 
+      <label for="leadEmail">Email address</label>
+      <input id="leadEmail" type="email" autocomplete="email" placeholder="name@example.com">
+
       <label for="leadPhone">WhatsApp number</label>
       <div class="phoneRow">
         <div class="phonePrefix">+91</div>
@@ -530,30 +533,44 @@ ul{padding-left:20px}
    never has to click a second "Submit" button. One form, one
    click, one save.
 ============================================================ */
-const GF_IDS = { name:"gf_name", designation:"gf_designation", phone:"gf_phone", score:"gf_score" };
+const GF_IDS = { name:"gf_name", designation:"gf_designation", phone:"gf_phone", email:"gf_email", score:"gf_score" };
 const GF_ACTION_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdktUoVGxgTE9HplfbJrjLfZflvLpTCxZwxUmLKax0GhasOtA/formResponse";
-const GF_ENTRY_IDS = { name:"entry.444788494", designation:"entry.1932503154", phone:"entry.1728020649", score:"entry.1115755263" };
+const GF_ENTRY_IDS = { name:"entry.444788494", phone:"entry.1728020649", email:"entry.298910990", designation:"entry.1932503154", score:"entry.1115755263" };
 
 function submitToGoogleForm(payload){
   console.log("[CareerUp] Submitting lead to Google Form:", payload);
 
-  // Single submission method: fetch() straight to the formResponse endpoint.
+  // Primary method: fetch() straight to the formResponse endpoint. This is the
+  // most reliable way to silently post to Google Forms — unlike a hidden iframe,
+  // it isn't commonly flagged/blocked by ad-blockers or privacy extensions.
   // mode:"no-cors" is required because Google doesn't send CORS headers back;
   // the response is opaque (we can't read success/failure from it), but the
   // POST itself still reaches Google and the row gets recorded.
-  // NOTE: only ONE method is used here — previously both fetch() and a hidden
-  // iframe were fired for the same event, which created two rows per submit.
   try{
     const fd = new FormData();
     fd.append(GF_ENTRY_IDS.name, payload.name);
     fd.append(GF_ENTRY_IDS.designation, payload.designation);
     fd.append(GF_ENTRY_IDS.phone, payload.phone);
+    fd.append(GF_ENTRY_IDS.email, payload.email || "");
     fd.append(GF_ENTRY_IDS.score, payload.score);
     fetch(GF_ACTION_URL, { method:"POST", mode:"no-cors", body: fd })
       .then(()=>console.log("[CareerUp] fetch() lead submission sent (response is opaque by design)."))
       .catch(err=>console.error("[CareerUp] fetch() lead submission failed:", err));
   }catch(err){
     console.error("[CareerUp] Could not build/send fetch submission:", err);
+  }
+
+  // Backup method: the original hidden-iframe form submit, in case fetch to
+  // this domain is blocked in a particular browser/network.
+  try{
+    document.getElementById(GF_IDS.name).value = payload.name;
+    document.getElementById(GF_IDS.designation).value = payload.designation;
+    document.getElementById(GF_IDS.phone).value = payload.phone;
+    document.getElementById(GF_IDS.email).value = payload.email || "";
+    document.getElementById(GF_IDS.score).value = payload.score;
+    document.getElementById("gform").submit();
+  }catch(err){
+    console.error("[CareerUp] Hidden-iframe fallback submission failed:", err);
   }
 }
 
@@ -576,9 +593,7 @@ const GF1_ENTRY_IDS = {
 function submitResumeExtractedLead(payload){
   console.log("[CareerUp] Submitting Step 1 (resume-extracted) lead:", payload);
 
-  // Single submission method: fetch() straight to the formResponse endpoint.
-  // NOTE: only ONE method is used here — previously both fetch() and a hidden
-  // iframe were fired for the same event, which created two rows per submit.
+  // Primary method: fetch() straight to the formResponse endpoint.
   try{
     const fd = new FormData();
     fd.append(GF1_ENTRY_IDS.name, payload.name);
@@ -591,6 +606,37 @@ function submitResumeExtractedLead(payload){
       .catch(err=>console.error("[CareerUp] Step 1 fetch() submission failed:", err));
   }catch(err){
     console.error("[CareerUp] Could not build/send Step 1 fetch submission:", err);
+  }
+
+  // Backup method: dynamically build a hidden form + iframe and submit it,
+  // in case fetch to this domain is blocked in a particular browser/network.
+  try{
+    let iframe = document.getElementById("gform1_iframe");
+    if(!iframe){
+      iframe = document.createElement("iframe");
+      iframe.name = "gform1_iframe";
+      iframe.id = "gform1_iframe";
+      iframe.style.display = "none";
+      iframe.setAttribute("aria-hidden","true");
+      document.body.appendChild(iframe);
+    }
+    const form = document.createElement("form");
+    form.action = GF1_ACTION_URL;
+    form.method = "POST";
+    form.target = "gform1_iframe";
+    form.style.display = "none";
+    Object.entries(GF1_ENTRY_IDS).forEach(([key, entryId])=>{
+      const input = document.createElement("input");
+      input.type = "text";
+      input.name = entryId;
+      input.value = payload[key] || "";
+      form.appendChild(input);
+    });
+    document.body.appendChild(form);
+    form.submit();
+    setTimeout(()=>form.remove(), 3000);
+  }catch(err){
+    console.error("[CareerUp] Step 1 hidden-iframe fallback submission failed:", err);
   }
 }
 
@@ -953,6 +999,7 @@ function runScan(){
 let capturedDesignation = "";
 let capturedName = "";
 let capturedPhone = "";
+let capturedEmail = "";
 
 // Pre-fill the Step 2 (Unlock Full Report) form with whatever we silently
 // captured from the resume in Step 1, so the visitor doesn't retype it.
@@ -962,10 +1009,12 @@ function prefillLeadForm(){
   const nameField=document.getElementById("leadName");
   const desigField=document.getElementById("leadDesignation");
   const phoneField=document.getElementById("leadPhone");
+  const emailField=document.getElementById("leadEmail");
   if(nameField) nameField.value = (capturedName && capturedName!=="Not provided") ? capturedName : "";
   if(desigField) desigField.value = (capturedDesignation && capturedDesignation!=="Not provided") ? capturedDesignation : "";
   const digits=(capturedPhone||"").replace(/\D/g,"").slice(-10);
   if(phoneField) phoneField.value = (digits.length===10) ? digits : "";
+  if(emailField) emailField.value = (capturedEmail && capturedEmail!=="Not provided") ? capturedEmail : "";
 }
 
 /* ---------------- consent-gated scan with silent background lead capture ---------------- */
@@ -1003,6 +1052,7 @@ document.getElementById("analyze").onclick=function(){
   capturedName = extracted.name || "Not provided";
   capturedDesignation = extracted.designation || "Not provided";
   capturedPhone = extracted.phone ? ("+91"+extracted.phone) : "Not provided";
+  capturedEmail = extracted.email || "Not provided";
   console.log("[CareerUp] Step 1 extracted from resume:", extracted);
   submitResumeExtractedLead({
     name: capturedName,
@@ -1019,11 +1069,17 @@ function handleSubmitLead(){
   const name=document.getElementById("leadName").value.trim();
   const designation=document.getElementById("leadDesignation").value.trim();
   const phoneDigits=document.getElementById("leadPhone").value.trim();
+  const email=document.getElementById("leadEmail").value.trim();
   const consent=document.getElementById("leadConsent").checked;
   const err=document.getElementById("leadErr");
 
   if(!name || !designation || !phoneDigits || !consent){
     err.textContent="Please fill in your name, target designation and WhatsApp number, and accept the consent checkbox.";
+    err.style.display="block";
+    return;
+  }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    err.textContent="Enter a valid email address.";
     err.style.display="block";
     return;
   }
@@ -1037,9 +1093,10 @@ function handleSubmitLead(){
   capturedDesignation = designation;
   capturedName = name;
   capturedPhone = phone;
+  capturedEmail = email;
 
   // Fire-and-forget submission straight to the Google Sheet — one click, one save.
-  submitToGoogleForm({ name, designation, phone, score: lastScore });
+  submitToGoogleForm({ name, designation, phone, email, score: lastScore });
 
   finishUnlock();
 }
